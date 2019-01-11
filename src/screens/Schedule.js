@@ -2,30 +2,45 @@ import React, { Component } from 'react';
 import { 
     StyleSheet, 
     View, 
-    Text, 
+    Text,
     ImageBackground,
     FlatList,
     TouchableOpacity,
-    Platform
+    Platform,
+    AsyncStorage
 } from 'react-native';
 import moment from 'moment';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import ActionButton from 'react-native-action-button';
 
 import 'moment/locale/pt-br';
 import todayImage from '../../assets/imgs/today.jpg';
 import commonStyles from '../commonStyles';
 import Task from '../components/Task';
+import AddTask from './AddTask';
 
 export default class Schedule extends Component {
     state = {
-        tasks: [
-            { id: Math.random(), desc: 'Aprender React Native', estimateAt: new Date(), doneAt: new Date() },
-            { id: Math.random(), desc: 'Concluir curso React Native', estimateAt: new Date(), doneAt: null },
-            { id: Math.random(), desc: 'Iniciar aplicativos', estimateAt: new Date(), doneAt: new Date() },
-            { id: Math.random(), desc: 'Fazer matricula para semestre da faculdade', estimateAt: new Date(), doneAt: null }
-        ],
+        tasks: [],
         visibleTasks: [],
-        showDoneTasks: true
+        showDoneTasks: true,
+        showAddTask: false
+    };
+
+    addTask = task => {
+        const tasks = [...this.state.tasks];
+        tasks.push({
+            id: Math.random(),
+            desc: task.desc,
+            estimateAt: task.date,
+            doneAt: null
+        });
+        this.setState({ tasks, showAddTask: false }, this.filterTasks)
+    };
+
+    deleteTask = id => {
+        const tasks = this.state.tasks.filter(task => task.id !== id);
+        this.setState({ tasks }, this.filterTasks);
     };
 
     toggleTask = id => {
@@ -57,20 +72,28 @@ export default class Schedule extends Component {
             visibleTasks = this.state.tasks.filter(pending);
         }
 
-        this.setState({ visibleTasks })
+        this.setState({ visibleTasks });
+        AsyncStorage.setItem('tasks', JSON.stringify(this.state.tasks));
     };
 
     toggleFilter = () => {
         this.setState({ showDoneTasks: !this.state.showDoneTasks }, this.filterTasks);
     };
 
-    componentDidMount = () => {
-        this.filterTasks();
+    componentDidMount = async () => {
+        const data = await AsyncStorage.getItem('tasks');
+        const tasks = JSON.parse(data) || [];
+        this.setState({ tasks }, this.filterTasks);
     };
 
     render () {
         return (
             <View style={styles.container}>
+                <AddTask 
+                    isVisible={this.state.showAddTask} 
+                    onSave={this.addTask}
+                    onCancel={() => this.setState({ showAddTask: false })}
+                />
                 <ImageBackground source={todayImage} style={styles.background}>
                     <View style={styles.iconBar} >
                         <TouchableOpacity onPress={this.toggleFilter}>
@@ -94,9 +117,13 @@ export default class Schedule extends Component {
                     <FlatList 
                         data={this.state.visibleTasks} 
                         keyExtractor={item => `${item.id}`} 
-                        renderItem={({ item }) => <Task {...item} toggleTask={this.toggleTask} />}
+                        renderItem={({ item }) => <Task {...item} onToggleTask={this.toggleTask} onDelete={this.deleteTask}/>}
                     />
                 </View>
+                <ActionButton 
+                    buttonColor={ commonStyles.colors.today }
+                    onPress={() => { this.setState({ showAddTask: true }) }}
+                />
             </View>
         );
     };
